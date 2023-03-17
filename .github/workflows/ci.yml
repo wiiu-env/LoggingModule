@@ -12,12 +12,12 @@ jobs:
     - uses: actions/checkout@v3
     - name: clang-format
       run: |
-        docker run --rm -v ${PWD}:/src ghcr.io/wiiu-env/clang-format:13.0.0-2 -r ./src
+        docker run --rm -v ${PWD}:/src ghcr.io/wiiu-env/clang-format:13.0.0-2 -r ./source
   build-binary:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     needs: clang-format
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: build binary
       run: |
         docker build . -t builder
@@ -28,7 +28,7 @@ jobs:
        path: "*.wms"
   deploy-binary:
     needs: build-binary
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     steps:   
     - name: Get environment variables
       id: get_repository_name
@@ -38,29 +38,15 @@ jobs:
     - uses: actions/download-artifact@master
       with:
         name: binary
-        path: wiiu/modules
     - name: zip artifact
-      run: zip -r ${{ env.REPOSITORY_NAME }}_${{ env.DATETIME }}.zip wiiu
+      run: zip -r ${{ env.REPOSITORY_NAME }}_${{ env.DATETIME }}.zip *.wms
     - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: "softprops/action-gh-release@v1"
       with:
         tag_name: ${{ env.REPOSITORY_NAME }}-${{ env.DATETIME }}
-        release_name: Nightly-${{ env.REPOSITORY_NAME }}-${{ env.DATETIME }}
         draft: false
         prerelease: true
-        body: |
-           Not a stable release:
-           ${{ github.event.head_commit.message }}
-    - name: Upload Release Asset
-      id: upload-release-asset 
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-        asset_path: ./${{ env.REPOSITORY_NAME }}_${{ env.DATETIME }}.zip
-        asset_name: ${{ env.REPOSITORY_NAME }}_${{ env.DATETIME }}.zip
-        asset_content_type: application/unknown
+        generate_release_notes: true
+        name: Nightly-${{ env.REPOSITORY_NAME }}-${{ env.DATETIME }}
+        files: |
+          ./${{ env.REPOSITORY_NAME }}_${{ env.DATETIME }}.zip
